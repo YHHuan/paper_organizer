@@ -63,21 +63,22 @@ class AppConfig(BaseSettings):
     budget: BudgetConfig = BudgetConfig()
 
     model_config = SettingsConfigDict(
-        toml_file=str(_CONFIG_FILE),
         env_prefix="PAPER_ORGANIZER_",
         env_nested_delimiter="__",
     )
 
 
 def get_config() -> AppConfig:
-    """Load and return the application config.
+    """Load config from TOML file, then overlay env vars."""
+    import tomllib
 
-    Reads from ~/.config/paper-organizer/config.toml when it exists,
-    falls back to all-defaults otherwise.
-    """
+    data: dict = {}
     if _CONFIG_FILE.exists():
-        return AppConfig()  # pydantic-settings picks up the toml_file automatically
-    return AppConfig()
+        try:
+            data = tomllib.loads(_CONFIG_FILE.read_text())
+        except Exception:
+            pass
+    return AppConfig(**data)
 
 
 def save_config(config: AppConfig) -> None:
