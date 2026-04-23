@@ -51,14 +51,30 @@ async def ingest(
         }
 
         # Run LLM synthesis; failures are non-fatal
+        analysis = None
         try:
             from paper_organizer.pipeline.synthesize import synthesize
-            from paper_organizer.config import get_config
+            from paper_organizer.config import get_config, get_secret
             cfg = get_config()
             analysis = await synthesize(metadata, lang=cfg.user.summary_lang)
             result.update({"sections": analysis.to_dict()})
         except Exception:
             pass
+
+        # Push to Zotero; failures are non-fatal
+        if analysis is not None and backend in ("zotero", "both"):
+            try:
+                import asyncio as _asyncio
+                from paper_organizer.backends.zotero import push_to_zotero
+                zot_key = cfg.backend.zotero_api_key or get_secret("zotero_api_key")
+                if cfg.backend.zotero_library_id and zot_key:
+                    item_key, created = await _asyncio.to_thread(
+                        push_to_zotero, metadata, analysis, None, cfg
+                    )
+                    result["zotero_key"] = item_key
+                    result["zotero_created"] = created
+            except Exception:
+                pass
 
     except Exception as e:
         result = {

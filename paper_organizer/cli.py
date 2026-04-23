@@ -313,6 +313,28 @@ def ingest(
     notes_path.write_text(analysis.to_markdown(metadata), encoding="utf-8")
     console.print(f"[green]Notes saved:[/green] {notes_path}")
 
+    # --- Push to Zotero ---
+    active_backend = backend or config.backend.primary
+    if active_backend in ("zotero", "both"):
+        from paper_organizer.config import get_secret as _get_secret
+        zot_key = config.backend.zotero_api_key or _get_secret("zotero_api_key")
+        zot_lib = config.backend.zotero_library_id
+        if zot_key and zot_lib:
+            from paper_organizer.backends.zotero import push_to_zotero
+            with console.status("[cyan]Pushing to Zotero...[/cyan]"):
+                try:
+                    item_key, created = push_to_zotero(metadata, analysis, pdf_path, config)
+                    if created:
+                        console.print(f"[green]Zotero:[/green] created item {item_key}")
+                    else:
+                        console.print(
+                            f"[yellow]Zotero:[/yellow] DOI already in library ({item_key})"
+                        )
+                except Exception as exc:
+                    console.print(f"[yellow]Zotero push failed:[/yellow] {exc}")
+        else:
+            console.print("[yellow]Zotero not configured — skipping[/yellow]")
+
     # --- Print summary ---
     console.print(f"\n[bold cyan]Clinical Analysis[/bold cyan]")
     console.print(f"[bold]One-liner:[/bold] {analysis.one_liner}")
