@@ -1,99 +1,76 @@
-# paper-organizer LiteLLM Proxy
+# paper-organizer FastAPI Proxy
 
-Shared LLM proxy for 3–5 lab members. Routes through OpenRouter (owner's key), enforces per-user monthly budget caps, logs to Postgres.
+Small FastAPI proxy for sharing one OpenRouter API key behind local virtual keys.
 
----
+It exposes OpenAI-compatible `/v1/*` routes and rewrites a few short model aliases before forwarding requests to OpenRouter.
 
-## 1. Deploy to Railway
+## Railway deployment
 
-**Option A — One-click (coming soon)**
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new)
+The Railway service should use:
 
-**Option B — Manual**
+- Root directory: `proxy/`
+- Builder: Dockerfile
+- Healthcheck path: `/health`
+- Public domain target port: the same port shown in the deploy log, e.g. `8080`
 
-1. Push this repo to GitHub (or fork it).
-2. In Railway: **New Project → Deploy from GitHub repo** → select your repo.
-3. Railway auto-detects `proxy/railway.toml` and builds `proxy/Dockerfile`.
-4. Add a **Postgres** add-on: Railway Dashboard → your project → **+ New** → **Database → PostgreSQL**. Railway injects `DATABASE_URL` automatically.
+Do not set `PORT=8000` for this service. Railway injects `PORT`, and the container starts Uvicorn on `0.0.0.0:$PORT`.
 
----
+If `/health` passes internally but the public domain returns `502 Application failed to respond`, check the public domain target port first. In Railway, open:
 
-## 2. Set environment variables
+`Service -> Settings -> Networking -> Public Networking -> domain edit`
 
-In Railway Dashboard → your service → **Variables**, add:
+Then set the target port to the port in the Uvicorn log, for example:
+
+```text
+INFO: Uvicorn running on http://0.0.0.0:8080
+```
+
+## Environment variables
+
+Set these in Railway:
 
 | Variable | Value |
 |---|---|
-| `LITELLM_MASTER_KEY` | Generate with `openssl rand -hex 32` — keep this secret |
-| `OPENROUTER_API_KEY` | Your OpenRouter key (starts with `sk-or-`) |
-| `DATABASE_URL` | Auto-injected by Railway Postgres add-on |
-| `PORT` | `8000` (already in `railway.toml`) |
+| `OPENROUTER_API_KEY` | Owner OpenRouter key, usually `sk-or-...` |
+| `MASTER_KEY` | Admin/shared proxy key |
+| `VIRTUAL_KEYS` | Optional comma-separated user keys |
 
-The proxy is live once the healthcheck at `/health` returns 200.
+`MASTER_KEY` and any key listed in `VIRTUAL_KEYS` can call `/v1/*`.
 
----
-
-## 3. Generate virtual keys for users
+## Health check
 
 ```bash
-export LITELLM_MASTER_KEY="your-master-key"
-export PROXY_URL="https://your-proxy.up.railway.app"
-
-chmod +x proxy/keygen.sh
-./proxy/keygen.sh alice 2.0    # $2/month cap for alice
-./proxy/keygen.sh bob   3.0    # $3/month cap for bob
+curl https://your-proxy.up.railway.app/health
 ```
 
-The script prints a JSON response containing the virtual key (`sk-...`). Copy the `key` field.
+Expected response:
 
-To revoke a key:
-```bash
-curl -X POST "$PROXY_URL/key/delete" \
-  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"keys": ["sk-..."]}'
+```json
+{"status":"ok"}
 ```
 
----
+## Usage
 
-## 4. Share with users
-
-Give each user:
-- Their virtual key (`sk-...`)
-- The proxy URL: `https://your-proxy.up.railway.app`
-
-**Example usage (OpenAI-compatible):**
 ```python
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="sk-...",                              # their virtual key
-    base_url="https://your-proxy.up.railway.app",
+    api_key="sk-user-or-master-key",
+    base_url="https://your-proxy.up.railway.app/v1",
 )
 
-# Use shared aliases (billed to owner's OpenRouter key)
 resp = client.chat.completions.create(
-    model="smart",   # or "fast", "gemini-fast"
-    messages=[{"role": "user", "content": "Summarize this paper..."}],
-)
-
-# Or pass-through with their own key (set via header)
-resp = client.chat.completions.create(
-    model="openai/gpt-4o",
-    messages=[...],
-    extra_headers={"x-openai-api-key": "sk-their-own-key"},
+    model="smart",
+    messages=[{"role": "user", "content": "Summarize this paper."}],
 )
 ```
-
----
 
 ## Model aliases
 
 | Alias | Routes to |
 |---|---|
-| `fast` | `openrouter/openai/gpt-4o-mini` |
-| `smart` | `openrouter/anthropic/claude-sonnet-4-6` |
-| `gemini-fast` | `openrouter/google/gemini-flash-2.0-exp` |
-| `openai/*` | Direct OpenAI (user's own key) |
-| `anthropic/*` | Direct Anthropic (user's own key) |
-| `google/*` | Direct Google AI (user's own key) |
+| `fast` | `openai/gpt-4o-mini` |
+| `smart` | `anthropic/claude-sonnet-4-6` |
+| `gemini-fast` | `google/gemini-flash-2.0-exp` |
+
+Requests with other model names are forwarded unchanged to OpenRouter.
