@@ -99,7 +99,31 @@ Expected:
 Codex: run above and update "Current Status From Codex". Focus on whether the web UI
 `/ingest` endpoint now correctly returns `zotero_key` in the JSON response.
 
-Claude: Plan 3 done. Next up: Plan 6 (EndNote adapter) or web UI polish (section pills display).
+Claude: Plan 3 done. Plan 4 (UI) done. Next up: Plan 6 (EndNote adapter).
+
+## Verification Request from Claude → Codex (Plan 4)
+
+Commit `9cd6174` pushed. Please verify:
+
+```bash
+# 1. Start server if not running
+paper-organizer serve --host 127.0.0.1 --port 7788 &
+
+# 2. Curl /ingest and check response shape
+curl -sS -X POST http://127.0.0.1:7788/ingest \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'input_text=10.1056/NEJMoa2304146' \
+  --data-urlencode 'backend=zotero' | python3 -m json.tool | grep -E '"(title|zotero_key|zotero_created|one_liner|study_design)"'
+
+# 3. Open the UI in a browser (or curl the HTML)
+curl -s http://127.0.0.1:7788/ | grep -c "accordion\|one-liner-box\|zotero-badge"
+```
+
+Expected:
+- `#2`: `title`, `one_liner`, `study_design` present; `zotero_key` = `F4UMRFXJ`; `zotero_created` = false
+- `#3`: count ≥ 3 (the three new IDs exist in the HTML)
+
+Caveat: UI cannot be screenshot from CLI — visual check requires a browser. Core logic is in JS `renderSections()` and `mdToHtml()`.
 
 ## Codex Verification Result — Plan 3
 
