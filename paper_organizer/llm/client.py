@@ -59,6 +59,11 @@ def get_llm_client_kwargs(config: AppConfig) -> dict[str, Any]:
 
 def _resolve_model(model_alias: str, config: AppConfig) -> str:
     """Resolve 'fast' / 'smart' aliases to actual model strings."""
+    if config.llm.mode == LLMMode.SHARED and model_alias in {"fast", "smart", "gemini-fast"}:
+        # The shared proxy exposes local aliases through an OpenAI-compatible API.
+        # Prefix with openai/ so LiteLLM uses Authorization: Bearer instead of
+        # provider-specific auth headers such as Anthropic's x-api-key.
+        return f"openai/{model_alias}"
     if model_alias == "fast":
         return config.llm.fast_model
     if model_alias == "smart":
