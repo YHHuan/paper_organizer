@@ -300,6 +300,10 @@ def ingest(
 
     if pdf_path:
         console.print(f"[green]PDF saved:[/green] {pdf_path.name}")
+    elif metadata.pdf_url:
+        console.print(
+            f"[yellow]PDF link found but automatic download failed:[/yellow] {metadata.pdf_url}"
+        )
     else:
         console.print("[yellow]PDF not available (open access only)[/yellow]")
 

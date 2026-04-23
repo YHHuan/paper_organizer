@@ -13,9 +13,9 @@ from pathlib import Path
 
 import httpx
 
+from paper_organizer.pipeline.contact import user_agent
 from paper_organizer.pipeline.models import PaperMetadata
 
-_UA = "paper-organizer/0.1 (mailto:paper-organizer@example.com)"
 _EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
 
@@ -138,14 +138,19 @@ async def acquire_pdf(
         return dest
 
     async with httpx.AsyncClient(
-        headers={"User-Agent": _UA},
+        headers={"User-Agent": user_agent()},
         timeout=60,
         follow_redirects=True,
     ) as client:
 
-        # --- Step 1: Unpaywall best OA PDF ---
-        if metadata.pdf_url:
-            data = await _try_download(metadata.pdf_url, client)
+        # --- Step 1: Unpaywall OA PDF URLs ---
+        pdf_urls: list[str] = []
+        for url in [metadata.pdf_url, *metadata.pdf_urls]:
+            if url and url not in pdf_urls:
+                pdf_urls.append(url)
+
+        for url in pdf_urls:
+            data = await _try_download(url, client)
             if data:
                 dest.write_bytes(data)
                 return dest

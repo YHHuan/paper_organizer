@@ -17,10 +17,9 @@ from typing import Any
 
 import httpx
 
+from paper_organizer.pipeline.contact import contact_email, user_agent
 from paper_organizer.pipeline.models import Author, PaperMetadata
 
-_MAILTO = "paper-organizer@example.com"
-_UA = f"paper-organizer/0.1 (mailto:{_MAILTO})"
 _CROSSREF_BASE = "https://api.crossref.org/works"
 _UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
 _EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
@@ -136,17 +135,19 @@ def _parse_crossref(data: dict[str, Any]) -> PaperMetadata:
 async def resolve_doi(doi: str) -> PaperMetadata:
     """Resolve a DOI via Crossref + Unpaywall; never raises."""
     metadata = PaperMetadata(doi=doi, url=f"https://doi.org/{doi}")
+    email = contact_email()
 
     async with httpx.AsyncClient(
-        headers={"User-Agent": _UA},
+        headers={"User-Agent": user_agent()},
         timeout=30,
         follow_redirects=True,
     ) as client:
         # --- Crossref ---
         try:
+            params = {"mailto": email} if email else None
             resp = await client.get(
                 f"{_CROSSREF_BASE}/{doi}",
-                params={"mailto": _MAILTO},
+                params=params,
             )
             if resp.status_code == 200:
                 metadata = _parse_crossref(resp.json())
@@ -155,20 +156,31 @@ async def resolve_doi(doi: str) -> PaperMetadata:
             pass
 
         # --- Unpaywall ---
-        try:
-            resp = await client.get(
-                f"{_UNPAYWALL_BASE}/{doi}",
-                params={"email": _MAILTO},
-            )
-            if resp.status_code == 200:
-                uw = resp.json()
-                metadata.is_open_access = bool(uw.get("is_oa", False))
-                best = uw.get("best_oa_location") or {}
-                pdf = best.get("url_for_pdf") or ""
-                if pdf:
-                    metadata.pdf_url = pdf
-        except Exception:
-            pass
+        if email:
+            try:
+                resp = await client.get(
+                    f"{_UNPAYWALL_BASE}/{doi}",
+                    params={"email": email},
+                )
+                if resp.status_code == 200:
+                    uw = resp.json()
+                    metadata.is_open_access = bool(uw.get("is_oa", False))
+                    pdf_urls: list[str] = []
+
+                    def add_pdf(url: str | None) -> None:
+                        if url and url not in pdf_urls:
+                            pdf_urls.append(url)
+
+                    best = uw.get("best_oa_location") or {}
+                    add_pdf(best.get("url_for_pdf"))
+                    for loc in uw.get("oa_locations") or []:
+                        add_pdf(loc.get("url_for_pdf"))
+
+                    metadata.pdf_urls = pdf_urls
+                    if pdf_urls:
+                        metadata.pdf_url = pdf_urls[0]
+            except Exception:
+                pass
 
         # --- PubMed abstract fallback ---
         # If Crossref didn't supply an abstract, look it up via DOI→PMID→efetch

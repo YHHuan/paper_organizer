@@ -42,10 +42,15 @@ def _find_by_doi(zot, doi: str, title: str = "") -> Optional[str]:
 
 
 def _build_journal_item(metadata: PaperMetadata) -> dict:
-    creators = [
-        {"creatorType": "author", "firstName": a.given, "lastName": a.family}
-        for a in metadata.authors
-    ]
+    creators = []
+    for author in metadata.authors:
+        given = author.given.strip()
+        family = author.family.strip()
+        if not given and not family:
+            continue
+        creators.append(
+            {"creatorType": "author", "firstName": given, "lastName": family}
+        )
     extra = f"PMID: {metadata.pmid}" if metadata.pmid else ""
     return {
         "itemType": "journalArticle",

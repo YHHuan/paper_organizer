@@ -255,3 +255,20 @@ Checks:
    - returned non-empty `one_liner` and `study_design`
 
 No blocker found for Plans 4, 6, or 7. Watch mode was not left running as a daemon; only help and identifier extraction were verified.
+
+## Codex Follow-Up — PDF Download And Input Notes
+
+Last updated: 2026-04-23 15:24 UTC
+
+User reported many open-access papers showed `PDF not available`.
+
+Findings:
+
+- Root cause 1: Unpaywall rejected the previous placeholder email `paper-organizer@example.com` with HTTP 422, so `pdf_url` was silently empty.
+- Fix: scholarly API requests now use `PAPER_ORGANIZER_UNPAYWALL_EMAIL`, `PAPER_ORGANIZER_CONTACT_EMAIL`, or `git config user.email` as contact email.
+- Root cause 2: resolver only used `best_oa_location.url_for_pdf`; now it collects every `oa_locations[].url_for_pdf`.
+- Validation: `10.1038/s41405-024-00202-x` now downloads and prints `PDF saved: Doura_Alomari_2024_s41405-024-00202-x.pdf`.
+- Caveat: some PMC-hosted author manuscripts return a proof-of-work/interstitial HTML page (`Preparing to download`) instead of PDF. CLI now distinguishes this as `PDF link found but automatic download failed: <url>` rather than `PDF not available`.
+- Zotero fix: skip empty Crossref creators before item creation. This fixed `10.1200/JCO.22.01064`, which now creates Zotero item `I644V5GJ`.
+- Web UI limitation: currently text input only (DOI / URL / PMID). PDF input exists through CLI watch mode, not web upload.
+- WSL note: `~/Downloads` may not exist; use `/mnt/c/Users/micha/Downloads`.

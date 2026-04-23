@@ -26,6 +26,7 @@ class PaperMetadata(BaseModel):
     abstract: str = ""
     url: str = ""       # canonical URL
     pdf_url: str = ""   # best open-access PDF URL found
+    pdf_urls: list[str] = []  # all open-access PDF URLs found
     is_open_access: bool = False
 
     def first_author_year(self) -> str:

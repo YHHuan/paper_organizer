@@ -57,7 +57,7 @@ Example output:
 ```
 Pitavastatin to Prevent Cardiovascular Disease in HIV Infection
 Steven K. Grinspoon, Kathleen V. Fitch, Markella V. Zanni (2023)
-PDF not available (open access only)
+PDF link found but automatic download failed: https://pmc.ncbi.nlm.nih.gov/...
 Notes saved: ~/lumen-notes/Grinspoon_2023.md
 Zotero: created item F4UMRFXJ
 
@@ -81,6 +81,8 @@ paper-organizer serve --tunnel # prints a public Cloudflare URL for your phone
 
 The web UI lets you paste a DOI and see the full analysis with expandable sections — no terminal required.
 
+Current limitation: the web UI accepts DOI / URL / PMID text input only. PDF file input is handled by watch mode.
+
 ### Watch a folder (auto-ingest PDFs)
 
 ```bash
@@ -88,6 +90,12 @@ paper-organizer watch ~/Downloads
 ```
 
 Drop any paper PDF into `~/Downloads` — the tool detects the DOI from the first two pages and runs the full pipeline automatically. Works great as a background process alongside Zotero's own "watch folder" feature.
+
+On WSL, your Windows Downloads folder is usually:
+
+```bash
+paper-organizer watch /mnt/c/Users/micha/Downloads
+```
 
 ```bash
 # Run in background
@@ -149,7 +157,10 @@ summary_lang = "en"   # or zh-TW, ja, etc.
 | `LLM unreachable` in doctor | Check your proxy token or API key; run `paper-organizer init` again |
 | `Zotero API` fail in doctor | Verify your library ID and API key at [zotero.org/settings/keys](https://www.zotero.org/settings/keys) |
 | "No DOI or PMID found" in watch mode | The PDF's first two pages don't contain an extractable ID; ingest it manually with `paper-organizer ingest <doi>` |
-| PDF not saved | Only open-access PDFs are downloaded automatically; subscription papers need manual upload to Zotero |
+| `Not a directory: ~/Downloads` on WSL | Use the Windows path, usually `/mnt/c/Users/micha/Downloads` |
+| PDF not saved | Only direct open-access PDFs are downloaded automatically; subscription papers need manual upload to Zotero |
+| PDF link found but automatic download failed | Metadata has an OA PDF URL, but the host blocked non-browser download or returned an interstitial page. Open the printed URL in a browser or upload/drop the PDF manually. PMC sometimes returns a proof-of-work "Preparing to download" page. |
+| Unpaywall returns no PDFs for obvious OA papers | Make sure `git config --global user.email` is set, or set `PAPER_ORGANIZER_UNPAYWALL_EMAIL`; Unpaywall requires a real contact email |
 
 ---
 
