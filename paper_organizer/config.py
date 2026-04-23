@@ -119,19 +119,55 @@ def save_config(config: AppConfig) -> None:
 
 
 def get_secret(key: str) -> str:
-    """Retrieve a secret from keyring, falling back to environment variable.
-
-    Keyring service name: "paper-organizer"
-    Falls back to env var PAPER_ORGANIZER_<KEY> (uppercased).
-    Returns empty string if not found.
-    """
-    value = keyring.get_password(_KEYRING_SERVICE, key)
+    """Retrieve a secret from keyring, falling back to file then env var."""
+    try:
+        value = keyring.get_password(_KEYRING_SERVICE, key)
+        if value:
+            return value
+    except Exception:
+        pass
+    # fallback 1: secrets file
+    value = _secrets_file_get(key)
     if value:
         return value
-    env_key = f"PAPER_ORGANIZER_{key.upper()}"
-    return os.environ.get(env_key, "")
+    # fallback 2: env var
+    return os.environ.get(f"PAPER_ORGANIZER_{key.upper()}", "")
 
 
 def set_secret(key: str, value: str) -> None:
-    """Store a secret in the system keyring."""
-    keyring.set_password(_KEYRING_SERVICE, key, value)
+    """Store a secret in system keyring, falling back to local secrets file."""
+    try:
+        keyring.set_password(_KEYRING_SERVICE, key, value)
+        return
+    except Exception:
+        pass
+    _secrets_file_set(key, value)
+
+
+_SECRETS_FILE = _CONFIG_DIR / "secrets.toml"
+
+
+def _secrets_file_get(key: str) -> str:
+    if not _SECRETS_FILE.exists():
+        return ""
+    try:
+        import tomllib
+        data = tomllib.loads(_SECRETS_FILE.read_text())
+        return data.get(key, "")
+    except Exception:
+        return ""
+
+
+def _secrets_file_set(key: str, value: str) -> None:
+    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    existing: dict = {}
+    if _SECRETS_FILE.exists():
+        try:
+            import tomllib
+            existing = tomllib.loads(_SECRETS_FILE.read_text())
+        except Exception:
+            pass
+    existing[key] = value
+    lines = [f'{k} = "{v}"' for k, v in existing.items()]
+    _SECRETS_FILE.write_text("\n".join(lines) + "\n")
+    _SECRETS_FILE.chmod(0o600)
