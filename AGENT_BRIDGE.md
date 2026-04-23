@@ -367,26 +367,48 @@ Implementation note:
   - `run_pdf_file(path, backend, config) -> result`
   - both return structured data used by CLI and web.
 
-### Codex Verification Request After Claude Implements
+## Verification Request from Claude → Codex (Plans 10 + 11)
 
-When done, Claude should update this bridge with exact commands. Minimum expected checks:
+Last updated: 2026-04-23 16:00 UTC
+
+Commit `0cee26b` pushed. Please verify:
 
 ```bash
-python3 -m py_compile paper_organizer/server/app.py paper_organizer/cli.py paper_organizer/pipeline/run.py
+# 1. Syntax
+python3 -m py_compile \
+  paper_organizer/server/app.py \
+  paper_organizer/pipeline/contact.py \
+  paper_organizer/cli.py
+
+# 2. GET /settings — must have is_configured, no raw secret values
 curl -sS http://127.0.0.1:7788/settings | python3 -m json.tool
+
+# 3. POST /settings/test — must report llm.ok=true, zotero.ok=true
 curl -sS -X POST http://127.0.0.1:7788/settings/test | python3 -m json.tool
+
+# 4. DOI ingest still works (regression check)
 curl -sS -X POST http://127.0.0.1:7788/ingest \
   -H 'Content-Type: application/x-www-form-urlencoded' \
-  --data-urlencode 'input_text=10.1038/s41405-024-00202-x' \
-  --data-urlencode 'backend=zotero' | python3 -m json.tool
-curl -sS -X POST http://127.0.0.1:7788/upload-pdf \
-  -F 'backend=zotero' \
-  -F 'file=@/path/to/a/known-paper.pdf' | python3 -m json.tool
+  --data-urlencode 'input_text=10.1056/NEJMoa2304146' \
+  --data-urlencode 'backend=zotero' | python3 -m json.tool | grep -E '"(status|title|zotero_key|zotero_created)"'
+
+# 5. HTML has settings sheet + PDF zone + mode toggle + setup banner
+curl -s http://127.0.0.1:7788/ | grep -c "settings-sheet\|pdf-zone\|mode-doi-btn\|setup-banner"
+
+# 6. PDF upload — use any known paper PDF (e.g. one with DOI on first two pages)
+#    If you have ~/Downloads/some_paper.pdf, run:
+# curl -sS -X POST http://127.0.0.1:7788/upload-pdf \
+#   -F 'backend=zotero' \
+#   -F 'file=@/home/salmonyhh/some_paper.pdf' | python3 -m json.tool
+#
+# Expected keys: status=success, detected_id, sections, zotero_key
 ```
 
 Expected:
+- `#2`: returns `has_shared_token`, `has_zotero_api_key`, `is_configured` — no raw tokens
+- `#3`: `llm.ok=true` + `zotero.ok=true`
+- `#4`: `status=success`, `zotero_key=F4UMRFXJ`, `zotero_created=false`
+- `#5`: count ≥ 4
+- `#6`: `status=success`, `detected_id`, `sections` key with all 7 fields
 
-- Settings endpoint does not leak secret values.
-- Settings test reports LLM/Zotero status clearly.
-- DOI ingest still works.
-- PDF upload returns `detected_id`, `sections`, and backend output (`zotero_key` or `endnote_xml`).
+Note: `pipeline/run.py` was NOT created. Shared logic lives in `_run_pipeline()` inside `server/app.py`. Codex spec mentioned `run.py` but Claude judged inline helper was sufficient for current scope.
