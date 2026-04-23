@@ -272,3 +272,121 @@ Findings:
 - Zotero fix: skip empty Crossref creators before item creation. This fixed `10.1200/JCO.22.01064`, which now creates Zotero item `I644V5GJ`.
 - Web UI limitation: currently text input only (DOI / URL / PMID). PDF input exists through CLI watch mode, not web upload.
 - WSL note: `~/Downloads` may not exist; use `/mnt/c/Users/micha/Downloads`.
+
+## Product Request From User — Web Onboarding + PDF Upload
+
+Last updated: 2026-04-23 15:28 UTC
+
+User wants the web app to be usable by other lab members without terminal setup. They also emphasized PDF upload as important.
+
+Codex recommendation for Claude to review and implement:
+
+### Scope
+
+Build this as a local/shared single-user web app first, not a full multi-tenant cloud product.
+
+Reasoning:
+
+- Current config/secrets are machine-local (`~/.config/paper-organizer/config.toml`, keyring/secrets file).
+- Zotero API keys and provider API keys are sensitive; storing per-browser user credentials in a hosted shared app needs auth, sessions, encryption, and a database.
+- The fastest useful version is: someone runs `paper-organizer serve`, opens the web UI, enters credentials once, and those are saved to that machine's config/secrets.
+
+### Plan 10 — Web Setup Wizard
+
+Add a settings/setup panel in the web UI.
+
+Fields:
+
+- LLM mode segmented control:
+  - `shared`: shared proxy endpoint + shared proxy token
+  - `own`: provider (`openai`, `anthropic`, `gemini`, `openrouter`) + API key + optional fast/smart model strings
+- Zotero:
+  - library ID
+  - library type (`user` / `group`)
+  - API key
+- Backend default:
+  - `zotero`, `endnote`, or `both`
+- Output language:
+  - default `zh-TW`
+- Optional contact email for Unpaywall:
+  - store as `PAPER_ORGANIZER_UNPAYWALL_EMAIL` equivalent in config, or add config field if cleaner
+
+Backend endpoints:
+
+- `GET /settings`
+  - returns non-secret config plus booleans like `has_shared_token`, `has_zotero_api_key`, `has_provider_api_key`
+- `POST /settings`
+  - saves non-secret fields with `save_config()`
+  - stores secrets via `set_secret()`
+  - never returns secret values
+- `POST /settings/test`
+  - runs lightweight checks:
+    - LLM ping
+    - Zotero `top(limit=1)` if configured
+    - Unpaywall email present/valid
+
+UI requirements:
+
+- If setup is incomplete, show setup panel before analysis input.
+- Keep analysis as first screen once configured.
+- Do not display saved secret values; show `configured` badges.
+- Make errors specific: invalid proxy token, missing Zotero library ID, Zotero auth failed, etc.
+
+### Plan 11 — Web PDF Upload
+
+Add direct PDF upload to the web app.
+
+Backend endpoint:
+
+- `POST /upload-pdf`
+  - multipart form: `file`, `backend`
+  - save upload to a temp file
+  - extract first two pages with PyMuPDF
+  - reuse `_extract_watch_identifier()` to find DOI/PMID
+  - resolve metadata
+  - use full PDF text for `synthesize(metadata, pdf_text=...)`
+  - copy/save PDF to `pdf_root`
+  - push to Zotero and/or export EndNote, same as CLI
+  - return same response shape as `/ingest`, plus:
+    - `source: "pdf_upload"`
+    - `detected_id`
+    - `pdf_saved_path`
+
+UI requirements:
+
+- Add a tab or segmented control: `DOI / URL` and `PDF`.
+- PDF pane should support file picker and drag/drop.
+- Show filename, upload progress/loading state, and clear error if no DOI/PMID found.
+- If no DOI/PMID found, return a helpful error suggesting manual DOI paste.
+
+Implementation note:
+
+- Refactor duplicated ingest logic into a shared pipeline function before adding upload, otherwise CLI/server/watch will drift.
+- Suggested module: `paper_organizer/pipeline/run.py`
+  - `run_identifier(identifier, backend, config) -> result`
+  - `run_pdf_file(path, backend, config) -> result`
+  - both return structured data used by CLI and web.
+
+### Codex Verification Request After Claude Implements
+
+When done, Claude should update this bridge with exact commands. Minimum expected checks:
+
+```bash
+python3 -m py_compile paper_organizer/server/app.py paper_organizer/cli.py paper_organizer/pipeline/run.py
+curl -sS http://127.0.0.1:7788/settings | python3 -m json.tool
+curl -sS -X POST http://127.0.0.1:7788/settings/test | python3 -m json.tool
+curl -sS -X POST http://127.0.0.1:7788/ingest \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'input_text=10.1038/s41405-024-00202-x' \
+  --data-urlencode 'backend=zotero' | python3 -m json.tool
+curl -sS -X POST http://127.0.0.1:7788/upload-pdf \
+  -F 'backend=zotero' \
+  -F 'file=@/path/to/a/known-paper.pdf' | python3 -m json.tool
+```
+
+Expected:
+
+- Settings endpoint does not leak secret values.
+- Settings test reports LLM/Zotero status clearly.
+- DOI ingest still works.
+- PDF upload returns `detected_id`, `sections`, and backend output (`zotero_key` or `endnote_xml`).
