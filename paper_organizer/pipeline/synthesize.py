@@ -1,7 +1,8 @@
 """LLM synthesis pipeline: produces 7-section clinical analysis from paper text."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass
 
 from paper_organizer.pipeline.models import PaperMetadata
 
@@ -152,13 +153,27 @@ def _parse_sections(raw: str) -> AnalysisSections:
     current_key: str | None = None
     current_lines: list[str] = []
 
+    def _field_for_header(line: str) -> str | None:
+        header_text = line.strip()
+        if not header_text.startswith("#"):
+            return None
+        header_text = header_text.lstrip("#").strip().lower()
+        header_text = re.sub(r"^\d+[\).:\-\s]+", "", header_text)
+        header_text = header_text.rstrip(":：").strip()
+        if header_text in header_map:
+            return header_map[header_text]
+        for expected, field_name in header_map.items():
+            if expected in header_text:
+                return field_name
+        return None
+
     for line in raw.splitlines():
-        if line.startswith("## "):
+        header_key = _field_for_header(line)
+        if header_key:
             # Save the previous section
             if current_key is not None:
                 sections[current_key] = "\n".join(current_lines).strip()
-            header_text = line[3:].strip().lower()
-            current_key = header_map.get(header_text)
+            current_key = header_key
             current_lines = []
         else:
             if current_key is not None:
@@ -167,6 +182,9 @@ def _parse_sections(raw: str) -> AnalysisSections:
     # Flush the last section
     if current_key is not None:
         sections[current_key] = "\n".join(current_lines).strip()
+
+    if not sections and raw.strip():
+        sections["one_liner"] = raw.strip()
 
     return AnalysisSections(
         one_liner=sections.get("one_liner", ""),

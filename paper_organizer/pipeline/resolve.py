@@ -12,6 +12,7 @@ Supported input formats
 from __future__ import annotations
 
 import re
+import xml.etree.ElementTree as ET
 from typing import Any
 
 import httpx
@@ -186,9 +187,16 @@ async def resolve_doi(doi: str) -> PaperMetadata:
                     rf = await client.get(fetch_url, params={
                         "db": "pubmed", "id": pmid, "rettype": "abstract", "retmode": "xml"
                     })
-                    match = re.search(r'<AbstractText[^>]*>(.*?)</AbstractText>', rf.text, re.DOTALL)
-                    if match:
-                        metadata.abstract = re.sub(r'<[^>]+>', '', match.group(1)).strip()
+                    root = ET.fromstring(rf.text)
+                    parts: list[str] = []
+                    for elem in root.findall(".//AbstractText"):
+                        text = "".join(elem.itertext()).strip()
+                        if not text:
+                            continue
+                        label = elem.attrib.get("Label", "").strip()
+                        parts.append(f"{label}: {text}" if label else text)
+                    if parts:
+                        metadata.abstract = "\n\n".join(parts)
             except Exception:
                 pass
 
