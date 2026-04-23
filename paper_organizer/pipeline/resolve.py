@@ -169,6 +169,29 @@ async def resolve_doi(doi: str) -> PaperMetadata:
         except Exception:
             pass
 
+        # --- PubMed abstract fallback ---
+        # If Crossref didn't supply an abstract, look it up via DOI→PMID→efetch
+        if not metadata.abstract and metadata.doi:
+            try:
+                search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+                r = await client.get(search_url, params={
+                    "db": "pubmed", "term": f"{doi}[doi]", "retmode": "json"
+                })
+                ids = r.json().get("esearchresult", {}).get("idlist", [])
+                if ids:
+                    pmid = ids[0]
+                    metadata.pmid = pmid
+                    # fetch abstract
+                    fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+                    rf = await client.get(fetch_url, params={
+                        "db": "pubmed", "id": pmid, "rettype": "abstract", "retmode": "xml"
+                    })
+                    match = re.search(r'<AbstractText[^>]*>(.*?)</AbstractText>', rf.text, re.DOTALL)
+                    if match:
+                        metadata.abstract = re.sub(r'<[^>]+>', '', match.group(1)).strip()
+            except Exception:
+                pass
+
     return metadata
 
 

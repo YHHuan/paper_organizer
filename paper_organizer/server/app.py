@@ -47,8 +47,19 @@ async def ingest(
             "abstract": abstract[:400] + "..." if len(abstract) > 400 else abstract,
             "pdf_available": bool(metadata.pdf_url),
             "backend": backend,
-            "message": "Metadata fetched. LLM analysis coming in next update.",
+            "message": "Metadata fetched.",
         }
+
+        # Run LLM synthesis; failures are non-fatal
+        try:
+            from paper_organizer.pipeline.synthesize import synthesize
+            from paper_organizer.config import get_config
+            cfg = get_config()
+            analysis = await synthesize(metadata, lang=cfg.user.summary_lang)
+            result.update({"sections": analysis.to_dict()})
+        except Exception:
+            pass
+
     except Exception as e:
         result = {
             "status": "partial",

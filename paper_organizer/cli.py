@@ -287,7 +287,35 @@ def ingest(
     else:
         console.print("[yellow]PDF not available (open access only)[/yellow]")
 
-    console.print("\n[dim]LLM analysis not yet implemented (Plan 2)[/dim]")
+    # --- Extract text from PDF if we have one ---
+    pdf_text = ""
+    if pdf_path and pdf_path.exists():
+        try:
+            import fitz  # pymupdf
+            doc = fitz.open(str(pdf_path))
+            pdf_text = "\n".join(page.get_text() for page in doc)[:8000]
+        except Exception:
+            pass
+
+    # --- LLM synthesis ---
+    from paper_organizer.pipeline.synthesize import synthesize
+
+    with console.status("[cyan]Running LLM analysis...[/cyan]"):
+        analysis = asyncio.run(
+            synthesize(metadata, pdf_text, config=config, lang=config.user.summary_lang)
+        )
+
+    # --- Save notes ---
+    notes_root = Path(config.backend.notes_root).expanduser()
+    notes_root.mkdir(parents=True, exist_ok=True)
+    safe_name = metadata.first_author_year().replace(" ", "_")
+    notes_path = notes_root / f"{safe_name}.md"
+    notes_path.write_text(analysis.to_markdown(metadata), encoding="utf-8")
+    console.print(f"[green]Notes saved:[/green] {notes_path}")
+
+    # --- Print summary ---
+    console.print(f"\n[bold cyan]Clinical Analysis[/bold cyan]")
+    console.print(f"[bold]One-liner:[/bold] {analysis.one_liner}")
 
 
 # ---------------------------------------------------------------------------
