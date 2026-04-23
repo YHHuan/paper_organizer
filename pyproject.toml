@@ -1,0 +1,32 @@
+[project]
+name = "paper-organizer"
+version = "0.1.0"
+description = "Research paper analysis CLI with Zotero/EndNote integration"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.12",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "litellm>=1.40",
+    "httpx>=0.27",
+    "tomli>=2.0; python_version < '3.11'",
+    "rich>=13.0",
+    "keyring>=25.0",
+    "structlog>=24.0",
+    "pyzotero>=1.5",
+    "pymupdf>=1.24",
+    "watchdog>=4.0",
+    "fastapi>=0.111",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+paper-organizer = "paper_organizer.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100

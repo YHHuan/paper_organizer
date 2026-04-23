@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paper Organizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Prevent double-tap zoom on iOS buttons */
+    button, select, input { touch-action: manipulation; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 px-4 py-5">
+    <div class="max-w-lg mx-auto">
+      <h1 class="text-2xl font-bold tracking-tight text-gray-900">Paper Organizer</h1>
+      <p class="mt-1 text-sm text-gray-500">
+        Paste a paper URL, DOI, or PMID to add it to your library
+      </p>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-lg mx-auto px-4 py-8 space-y-8">
+
+    <!-- Submission form -->
+    <section class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-5">
+
+      <div class="space-y-2">
+        <label for="input_text" class="block text-sm font-medium text-gray-700">
+          Paper URL, DOI, or PMID
+        </label>
+        <textarea
+          id="input_text"
+          name="input_text"
+          rows="3"
+          class="w-full rounded-xl border border-gray-300 px-4 py-3 text-base
+                 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500
+                 focus:border-transparent resize-none"
+          placeholder="https://pubmed.ncbi.nlm.nih.gov/12345678&#10;10.1056/NEJMoa2304146&#10;PMID: 12345678"
+        ></textarea>
+      </div>
+
+      <!-- Backend selector -->
+      <div class="space-y-2">
+        <p class="text-sm font-medium text-gray-700">Add to</p>
+        <div class="flex flex-wrap gap-3">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="radio" name="backend" value="zotero" checked
+                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+            <span class="text-sm text-gray-700">Zotero</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="radio" name="backend" value="endnote"
+                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+            <span class="text-sm text-gray-700">EndNote</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="radio" name="backend" value="both"
+                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+            <span class="text-sm text-gray-700">Both</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button
+        id="submit-btn"
+        type="button"
+        onclick="submitPaper()"
+        class="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600
+               px-5 py-3.5 text-base font-semibold text-white
+               hover:bg-blue-700 active:bg-blue-800
+               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+               transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        <span id="btn-label">Add Paper</span>
+        <!-- Spinner (hidden by default) -->
+        <svg id="spinner" class="hidden animate-spin h-5 w-5 text-white"
+             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10"
+                  stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
+        </svg>
+      </button>
+    </section>
+
+    <!-- Response area (hidden until first submission) -->
+    <section id="response-area" class="hidden">
+      <div id="response-box"
+           class="rounded-2xl border px-5 py-4 text-sm leading-relaxed space-y-1">
+      </div>
+    </section>
+
+    <!-- Recent submissions placeholder -->
+    <section class="space-y-3">
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">How to use</h2>
+      <ul class="space-y-2 text-sm text-gray-600">
+        <li class="flex gap-2">
+          <span class="mt-0.5 text-blue-500 shrink-0">1.</span>
+          Paste any PubMed URL, DOI, or bare PMID into the field above.
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 text-blue-500 shrink-0">2.</span>
+          Choose the reference manager you want the paper added to.
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 text-blue-500 shrink-0">3.</span>
+          Tap <strong>Add Paper</strong>. The server fetches metadata and imports it automatically.
+        </li>
+      </ul>
+    </section>
+
+    <!-- Divider -->
+    <hr class="border-gray-200" />
+
+    <!-- Mobile Setup -->
+    <section class="space-y-3">
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Mobile Setup</h2>
+      <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 space-y-3 text-sm text-amber-900">
+        <p>
+          To use Paper Organizer from your phone, your computer must be running
+          the tunnel command:
+        </p>
+        <pre class="bg-amber-100 rounded-lg px-3 py-2 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all">paper-organizer serve --tunnel</pre>
+        <p>
+          This starts a Cloudflare Tunnel and prints a public HTTPS URL.
+          Open that URL on any device — no VPN or port-forwarding needed.
+        </p>
+        <p class="text-xs text-amber-700">
+          The tunnel URL changes each time the command is run. Share it fresh
+          with lab members each session, or use a named tunnel for a stable URL.
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="max-w-lg mx-auto px-4 py-6 text-center text-xs text-gray-400">
+    Paper Organizer &mdash; running on localhost:7788
+  </footer>
+
+  <script>
+    async function submitPaper() {
+      const inputEl = document.getElementById('input_text');
+      const input   = inputEl.value.trim();
+      const backend = document.querySelector('input[name="backend"]:checked')?.value ?? 'zotero';
+
+      if (!input) {
+        showResponse('error', 'Please enter a URL, DOI, or PMID first.');
+        return;
+      }
+
+      setLoading(true);
+
+      const formData = new FormData();
+      formData.append('input_text', input);
+      formData.append('backend', backend);
+
+      try {
+        const res  = await fetch('/ingest', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok || data.status === 'error') {
+          showResponse('error', data.message ?? 'Something went wrong.');
+        } else {
+          showResponse('success', data.message ?? 'Queued!', {
+            Input:   data.input,
+            Backend: data.backend,
+            Status:  data.status,
+          });
+          inputEl.value = ''; // clear on success
+        }
+      } catch (err) {
+        showResponse('error', 'Network error — is the server running? ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function setLoading(on) {
+      const btn     = document.getElementById('submit-btn');
+      const label   = document.getElementById('btn-label');
+      const spinner = document.getElementById('spinner');
+      btn.disabled  = on;
+      label.textContent = on ? 'Submitting…' : 'Add Paper';
+      spinner.classList.toggle('hidden', !on);
+    }
+
+    function showResponse(type, message, details) {
+      const area = document.getElementById('response-area');
+      const box  = document.getElementById('response-box');
+
+      const isSuccess = type === 'success';
+      box.className = [
+        'rounded-2xl border px-5 py-4 text-sm leading-relaxed space-y-2',
+        isSuccess
+          ? 'bg-green-50 border-green-200 text-green-900'
+          : 'bg-red-50  border-red-200  text-red-900',
+      ].join(' ');
+
+      let html = `<p class="font-medium">${escHtml(message)}</p>`;
+
+      if (details) {
+        html += '<dl class="text-xs space-y-0.5 opacity-80">';
+        for (const [k, v] of Object.entries(details)) {
+          html += `<div class="flex gap-1"><dt class="font-semibold">${escHtml(k)}:</dt>
+                   <dd class="break-all">${escHtml(String(v))}</dd></div>`;
+        }
+        html += '</dl>';
+      }
+
+      box.innerHTML = html;
+      area.classList.remove('hidden');
+      area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    // Allow Cmd/Ctrl+Enter to submit from the textarea
+    document.getElementById('input_text').addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submitPaper();
+    });
+  </script>
+</body>
+</html>

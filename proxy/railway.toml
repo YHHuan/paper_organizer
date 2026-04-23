@@ -1,0 +1,26 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "proxy/Dockerfile"
+
+[deploy]
+# Railway replaces $PORT with the assigned port at runtime
+startCommand = "litellm --config /app/config.yaml --port $PORT --detailed_debug"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "litellm-proxy"
+
+[services.variables]
+# Mark as secret so Railway never exposes them in logs or UI
+LITELLM_MASTER_KEY  = { secret = true }
+OPENROUTER_API_KEY  = { secret = true }
+DATABASE_URL        = { secret = true }
+PORT                = "8000"
+
+# Optional: supply if users want to pass-through their own keys
+# OPENAI_API_KEY    = { secret = true }
+# ANTHROPIC_API_KEY = { secret = true }
+# GEMINI_API_KEY    = { secret = true }
