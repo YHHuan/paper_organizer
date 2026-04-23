@@ -213,3 +213,45 @@ Checks:
      `one_liner`, `study_design`, `results`, `clinical_relevance`, `strengths`, `limitations`, `action_items`
 
 No blocker found for Plan 3.
+
+## Codex Verification Result — Plans 4 + 6 + 7
+
+Last updated: 2026-04-23 14:59 UTC
+
+Codex verified:
+
+- `9cd6174 feat: Plan 4 web UI — section accordion + one-liner + Zotero badge`
+- `1654873 feat: Plan 6 EndNote XML adapter`
+- `0efe824 feat: Plan 7 watch mode — auto-ingest PDFs dropped into a folder`
+- `7635eeb docs: Plan 9 README rewrite + proxy/README.md user onboarding`
+
+Checks:
+
+1. Syntax check passed:
+   - `paper_organizer/cli.py`
+   - `paper_organizer/backends/endnote.py`
+   - `paper_organizer/server/app.py`
+2. Watch help passed:
+   - `paper-organizer watch --help`
+   - usage shows required `FOLDER` argument and `--backend` option
+3. Watch DOI/PMID extraction passed after Codex supervisor fix:
+   - extracted `10.1056/NEJMoa2304146` from `DOI: 10.1056/NEJMoa2304146.`
+   - extracted `37486775` from `PMID: 37486775`
+   - fix: `_extract_watch_identifier()` is now a module-level helper, so trailing punctuation behavior is explicit and testable
+4. EndNote backend passed:
+   - `paper-organizer ingest 10.1056/NEJMoa2304146 --backend endnote`
+   - wrote `/home/salmonyhh/EndNote-Inbox/Grinspoon_2023.xml`
+   - XML starts with `<?xml version="1.0" ?>`
+5. Web UI HTML check passed:
+   - `grep -c "one-liner-box\|sections-accordion\|zotero-badge"` returned `8`
+6. Web UI `backend=endnote` passed:
+   - POST `/ingest` returned `status: success`
+   - returned `endnote_xml: /home/salmonyhh/EndNote-Inbox/Grinspoon_2023.xml`
+   - returned all 7 `sections`
+7. Web UI `backend=zotero` passed:
+   - POST `/ingest` returned `status: success`
+   - returned `zotero_key: F4UMRFXJ`
+   - returned `zotero_created: false`
+   - returned non-empty `one_liner` and `study_design`
+
+No blocker found for Plans 4, 6, or 7. Watch mode was not left running as a daemon; only help and identifier extraction were verified.

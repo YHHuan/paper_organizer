@@ -12,6 +12,7 @@ watch   Watch a folder for new PDFs  (watch mode stub)
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 from pathlib import Path
 from typing import Annotated, Optional
@@ -31,6 +32,9 @@ app = typer.Typer(
 
 console = Console()
 err_console = Console(stderr=True, style="bold red")
+
+_WATCH_DOI_RE = re.compile(r'\b(10\.\d{4,}/\S+?)(?=[,;\s\]>"\)]|$)', re.IGNORECASE)
+_WATCH_PMID_RE = re.compile(r"PMID[:\s]+(\d{6,8})", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +61,18 @@ def _warn(label: str, detail: str = "") -> None:
     if detail:
         msg += f" [dim]({detail})[/dim]"
     console.print(msg)
+
+
+def _extract_watch_identifier(text: str) -> str:
+    """Find a DOI or PMID in text extracted from a dropped PDF."""
+    snippet = text[:3000]
+    doi_match = _WATCH_DOI_RE.search(snippet)
+    if doi_match:
+        return doi_match.group(1).rstrip(".,;")
+    pmid_match = _WATCH_PMID_RE.search(snippet)
+    if pmid_match:
+        return pmid_match.group(1)
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -411,7 +427,6 @@ def watch(
     ] = None,
 ) -> None:
     """Watch a folder for new PDFs and auto-ingest them via the full pipeline."""
-    import re
     import time
     import asyncio as _asyncio
     from watchdog.observers import Observer
@@ -433,19 +448,9 @@ def watch(
     notes_root = Path(config.backend.notes_root).expanduser()
     notes_root.mkdir(parents=True, exist_ok=True)
 
-    _DOI_RE   = re.compile(r'\b(10\.\d{4,}/\S+?)(?=[,;\s\]>"\)]|$)', re.IGNORECASE)
-    _PMID_RE  = re.compile(r'PMID[:\s]+(\d{6,8})', re.IGNORECASE)
-
     def _extract_id(text: str) -> str:
         """Try to find a DOI or PMID in the first 3000 chars of PDF text."""
-        snippet = text[:3000]
-        m = _DOI_RE.search(snippet)
-        if m:
-            return m.group(1).rstrip(".")
-        m = _PMID_RE.search(snippet)
-        if m:
-            return m.group(1)
-        return ""
+        return _extract_watch_identifier(text)
 
     def _process(pdf_path: Path) -> None:
         console.rule(f"[cyan]New PDF[/cyan]: {pdf_path.name}")
