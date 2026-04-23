@@ -5,6 +5,6 @@ dockerfilePath = "Dockerfile"
 [deploy]
 startCommand = "litellm --config /app/config.yaml --port $PORT"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
