@@ -109,7 +109,8 @@ def save_config(config: AppConfig) -> None:
         for sub_key, sub_val in subsections.items():
             _write_section(f"{prefix}.{sub_key}", sub_val)
 
-    data = config.model_dump()
+    # model_dump(mode="json") converts enums to their .value strings automatically
+    data = config.model_dump(mode="json")
     for section, values in data.items():
         if isinstance(values, dict):
             _write_section(section, values)
