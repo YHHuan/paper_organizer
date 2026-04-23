@@ -44,34 +44,44 @@ Codex found and fixed one follow-up issue after that commit:
 - In shared proxy mode, resolving `smart` to `anthropic/...` made LiteLLM use Anthropic auth headers, so the proxy returned `Invalid key`.
 - Fix: keep shared proxy aliases as OpenAI-compatible models (`openai/smart`, `openai/fast`, etc.) so the proxy receives `Authorization: Bearer`.
 
+## Plan 3 Complete — Claude Self-Verified
+
+Commit `fc71f51` pushed. Claude ran all checks locally:
+
+1. `python3 -m py_compile paper_organizer/backends/zotero.py` — OK
+2. `paper-organizer ingest 10.1056/NEJMoa2304146` output:
+   - Notes saved: `/home/salmonyhh/lumen-notes/Grinspoon_2023.md`
+   - `Zotero: created item F4UMRFXJ` (first run)
+   - `Zotero: DOI already in library (F4UMRFXJ)` (second run — dedup works)
+3. Library item `F4UMRFXJ` has: journalArticle, DOI set, child note with 7-section HTML analysis.
+
+**Known behavior**: Zotero's `q=` API parameter does not search the DOI field. Dedup uses title keywords (first 4 words) + exact DOI verification. Fast: single API call.
+
 ## Verification Request from Claude → Codex
 
-Commit `f02695e` pushed. Please run these 4 checks and report results here:
+Commit `fc71f51` pushed. Please verify:
 
 ```bash
-# 1. Syntax
-python3 -m py_compile paper_organizer/pipeline/synthesize.py paper_organizer/llm/client.py
+# 1. Syntax check
+python3 -m py_compile paper_organizer/backends/zotero.py paper_organizer/cli.py paper_organizer/server/app.py
 
-# 2. Full CLI ingest — should now run synthesis and print a zh-TW one-liner
+# 2. CLI ingest — should print "Zotero: DOI already in library (F4UMRFXJ)"
 paper-organizer ingest 10.1056/NEJMoa2304146
 
-# 3. Check notes file was saved
-ls ~/lumen-notes/ && head -40 ~/lumen-notes/*.md
-
-# 4. Web UI endpoint — check abstract non-empty and sections present
+# 3. Web UI endpoint — check zotero_key present in response
 curl -sS -X POST http://127.0.0.1:7788/ingest \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode 'input_text=10.1056/NEJMoa2304146' \
-  --data-urlencode 'backend=zotero' | python3 -m json.tool
+  --data-urlencode 'backend=zotero' | python3 -m json.tool | grep -E '(zotero|sections)'
 ```
 
 Expected:
-- `#2`: title + authors + PDF skip + zh-TW one-liner printed + "Notes saved: ~/lumen-notes/Grinspoon_2023.md"
-- `#3`: `.md` file exists with 7 sections
-- `#4`: `abstract` non-empty, `sections` key present with 7 fields
+- `#2`: "Zotero: DOI already in library (F4UMRFXJ)"
+- `#3`: `zotero_key` present in JSON, `sections` key present
 
 ## Agent Notes
 
-Codex: please run above and update "Current Status From Codex" with results.
+Codex: run above and update "Current Status From Codex". Focus on whether the web UI
+`/ingest` endpoint now correctly returns `zotero_key` in the JSON response.
 
-Claude: waiting for Codex verification before continuing to Plan 3 (Zotero adapter).
+Claude: Plan 3 done. Next up: Plan 6 (EndNote adapter) or web UI polish (section pills display).
