@@ -405,14 +405,166 @@ def serve(
 @app.command()
 def watch(
     folder: Annotated[str, typer.Argument(help="Folder to watch for new PDFs")],
+    backend: Annotated[
+        Optional[str],
+        typer.Option("--backend", help="Override backend: zotero | endnote | both"),
+    ] = None,
 ) -> None:
-    """Watch a folder for new PDFs and auto-ingest them. (Stub — not yet implemented.)"""
+    """Watch a folder for new PDFs and auto-ingest them via the full pipeline."""
+    import re
+    import time
+    import asyncio as _asyncio
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+
+    from paper_organizer.config import get_config, get_secret as _get_secret
+    from paper_organizer.pipeline.resolve import resolve
+    from paper_organizer.pipeline.acquire import acquire_pdf
+    from paper_organizer.pipeline.synthesize import synthesize
+
     watch_path = Path(folder).expanduser().resolve()
-    console.print(
-        f"[yellow]Watch mode not yet implemented[/yellow] for: [cyan]{watch_path}[/cyan]\n"
-        "When implemented, this will use watchdog to monitor the folder and\n"
-        "automatically call [cyan]ingest[/cyan] on any new PDF that appears."
-    )
+    if not watch_path.is_dir():
+        err_console.print(f"Not a directory: {watch_path}")
+        raise typer.Exit(1)
+
+    config = get_config()
+    active_backend = backend or config.backend.primary
+    pdf_root  = Path(config.backend.pdf_root).expanduser()
+    notes_root = Path(config.backend.notes_root).expanduser()
+    notes_root.mkdir(parents=True, exist_ok=True)
+
+    _DOI_RE   = re.compile(r'\b(10\.\d{4,}/\S+?)(?=[,;\s\]>"\)]|$)', re.IGNORECASE)
+    _PMID_RE  = re.compile(r'PMID[:\s]+(\d{6,8})', re.IGNORECASE)
+
+    def _extract_id(text: str) -> str:
+        """Try to find a DOI or PMID in the first 3000 chars of PDF text."""
+        snippet = text[:3000]
+        m = _DOI_RE.search(snippet)
+        if m:
+            return m.group(1).rstrip(".")
+        m = _PMID_RE.search(snippet)
+        if m:
+            return m.group(1)
+        return ""
+
+    def _process(pdf_path: Path) -> None:
+        console.rule(f"[cyan]New PDF[/cyan]: {pdf_path.name}")
+
+        # Give the OS a moment to finish copying
+        time.sleep(1.5)
+        if not pdf_path.exists():
+            console.print("[yellow]File vanished before processing.[/yellow]")
+            return
+
+        # Extract text from first 2 pages
+        pdf_text = ""
+        try:
+            import fitz
+            doc = fitz.open(str(pdf_path))
+            pdf_text = "\n".join(doc[i].get_text() for i in range(min(2, len(doc))))
+        except Exception as exc:
+            console.print(f"[yellow]PDF read error:[/yellow] {exc}")
+
+        paper_id = _extract_id(pdf_text)
+        if not paper_id:
+            console.print("[yellow]No DOI or PMID found in first 2 pages — skipping.[/yellow]")
+            return
+
+        console.print(f"Found ID: [bold]{paper_id}[/bold]")
+
+        try:
+            metadata = _asyncio.run(resolve(paper_id))
+        except Exception as exc:
+            console.print(f"[red]Resolve failed:[/red] {exc}")
+            return
+
+        if not metadata.title:
+            console.print("[yellow]Could not resolve metadata.[/yellow]")
+            return
+
+        console.print(f"[bold]{metadata.title}[/bold]")
+        console.print(f"[dim]{', '.join(a.full_name() for a in metadata.authors[:3])} ({metadata.year})[/dim]")
+
+        # Full PDF text for synthesis (already have it from the dropped file)
+        full_text = ""
+        try:
+            import fitz
+            doc = fitz.open(str(pdf_path))
+            full_text = "\n".join(page.get_text() for page in doc)[:8000]
+        except Exception:
+            pass
+
+        try:
+            analysis = _asyncio.run(
+                synthesize(metadata, full_text, config=config, lang=config.user.summary_lang)
+            )
+        except Exception as exc:
+            console.print(f"[red]Synthesis failed:[/red] {exc}")
+            return
+
+        # Save notes
+        safe_name = metadata.first_author_year().replace(" ", "_")
+        notes_path = notes_root / f"{safe_name}.md"
+        notes_path.write_text(analysis.to_markdown(metadata), encoding="utf-8")
+        console.print(f"[green]Notes saved:[/green] {notes_path}")
+
+        # Copy PDF into pdf_root if it isn't already there
+        pdf_root.mkdir(parents=True, exist_ok=True)
+        dest_pdf = pdf_root / pdf_path.name
+        if not dest_pdf.exists():
+            import shutil
+            shutil.copy2(pdf_path, dest_pdf)
+            console.print(f"[green]PDF copied:[/green] {dest_pdf.name}")
+        else:
+            dest_pdf = pdf_path  # use in-place
+
+        # Zotero
+        if active_backend in ("zotero", "both"):
+            zot_key = config.backend.zotero_api_key or _get_secret("zotero_api_key")
+            if zot_key and config.backend.zotero_library_id:
+                from paper_organizer.backends.zotero import push_to_zotero
+                try:
+                    item_key, created = push_to_zotero(metadata, analysis, dest_pdf, config)
+                    console.print(
+                        f"[green]Zotero:[/green] {'created' if created else 'already in library'} ({item_key})"
+                    )
+                except Exception as exc:
+                    console.print(f"[yellow]Zotero:[/yellow] {exc}")
+
+        # EndNote
+        if active_backend in ("endnote", "both"):
+            from paper_organizer.backends.endnote import export_to_endnote
+            try:
+                xml_path = export_to_endnote(metadata, analysis, dest_pdf, config)
+                console.print(f"[green]EndNote XML:[/green] {xml_path.name}")
+            except Exception as exc:
+                console.print(f"[yellow]EndNote:[/yellow] {exc}")
+
+        console.print(f"[bold cyan]One-liner:[/bold cyan] {analysis.one_liner}\n")
+
+    class _Handler(FileSystemEventHandler):
+        def on_created(self, event):
+            if not event.is_directory and event.src_path.lower().endswith(".pdf"):
+                try:
+                    _process(Path(event.src_path))
+                except Exception as exc:
+                    console.print(f"[red]Unexpected error:[/red] {exc}")
+
+    observer = Observer()
+    observer.schedule(_Handler(), str(watch_path), recursive=False)
+    observer.start()
+
+    console.rule("[bold cyan]paper-organizer watch[/bold cyan]")
+    console.print(f"Watching [cyan]{watch_path}[/cyan] for new PDFs …")
+    console.print(f"Backend: [bold]{active_backend}[/bold]   [dim](Ctrl-C to stop)[/dim]\n")
+
+    try:
+        while observer.is_alive():
+            observer.join(timeout=1)
+    except KeyboardInterrupt:
+        observer.stop()
+        observer.join()
+        console.print("\n[dim]Watch stopped.[/dim]")
 
 
 # ---------------------------------------------------------------------------
