@@ -335,6 +335,16 @@ def ingest(
         else:
             console.print("[yellow]Zotero not configured — skipping[/yellow]")
 
+    # --- Export to EndNote ---
+    if active_backend in ("endnote", "both"):
+        from paper_organizer.backends.endnote import export_to_endnote
+        with console.status("[cyan]Exporting to EndNote...[/cyan]"):
+            try:
+                xml_path = export_to_endnote(metadata, analysis, pdf_path, config)
+                console.print(f"[green]EndNote XML:[/green] {xml_path}")
+            except Exception as exc:
+                console.print(f"[yellow]EndNote export failed:[/yellow] {exc}")
+
     # --- Print summary ---
     console.print(f"\n[bold cyan]Clinical Analysis[/bold cyan]")
     console.print(f"[bold]One-liner:[/bold] {analysis.one_liner}")

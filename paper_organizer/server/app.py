@@ -61,6 +61,15 @@ async def ingest(
         except Exception:
             pass
 
+        # Export to EndNote; failures are non-fatal
+        if analysis is not None and backend in ("endnote", "both"):
+            try:
+                from paper_organizer.backends.endnote import export_to_endnote
+                xml_path = export_to_endnote(metadata, analysis, None, cfg)
+                result["endnote_xml"] = str(xml_path)
+            except Exception:
+                pass
+
         # Push to Zotero; failures are non-fatal
         if analysis is not None and backend in ("zotero", "both"):
             try:
