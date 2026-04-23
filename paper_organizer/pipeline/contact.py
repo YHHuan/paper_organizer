@@ -22,6 +22,15 @@ def contact_email() -> str:
         if value:
             return value
 
+    # Fall back to secret store (set via web settings panel)
+    try:
+        from paper_organizer.config import get_secret
+        value = _valid_email(get_secret("unpaywall_email") or "")
+        if value:
+            return value
+    except Exception:
+        pass
+
     for args in (
         ("git", "config", "user.email"),
         ("git", "config", "--global", "user.email"),
