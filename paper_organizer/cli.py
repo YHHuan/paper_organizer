@@ -259,23 +259,35 @@ def ingest(
         typer.Option("--backend", help="Override backend: zotero | endnote | both"),
     ] = None,
 ) -> None:
-    """Ingest a paper by DOI, URL, or PMID. (Pipeline stub — not yet implemented.)"""
+    """Ingest a paper by DOI, URL, or PMID."""
     from paper_organizer.config import get_config
+    from paper_organizer.pipeline.resolve import resolve
+    from paper_organizer.pipeline.acquire import acquire_pdf
 
     config = get_config()
-    effective_backend = backend or config.backend.primary
 
+    with console.status(f"[cyan]Resolving {input}...[/cyan]"):
+        metadata = asyncio.run(resolve(input))
+
+    if not metadata.title:
+        console.print(f"[red]Could not resolve: {input}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]{metadata.title}[/bold]")
     console.print(
-        f"[yellow]Pipeline not yet implemented.[/yellow] "
-        f"Received: [cyan]{input}[/cyan]  backend=[cyan]{effective_backend}[/cyan]"
+        f"[dim]{', '.join(a.full_name() for a in metadata.authors[:3])} ({metadata.year})[/dim]"
     )
-    console.print(
-        "When implemented, this will:\n"
-        "  1. Resolve the identifier → metadata + PDF URL\n"
-        "  2. Download the PDF to pdf_root\n"
-        "  3. Extract structured notes via LLM\n"
-        f"  4. Push to {effective_backend}\n"
-    )
+
+    pdf_root = Path(config.backend.pdf_root).expanduser()
+    with console.status("[cyan]Downloading PDF...[/cyan]"):
+        pdf_path = asyncio.run(acquire_pdf(metadata, pdf_root))
+
+    if pdf_path:
+        console.print(f"[green]PDF saved:[/green] {pdf_path.name}")
+    else:
+        console.print("[yellow]PDF not available (open access only)[/yellow]")
+
+    console.print("\n[dim]LLM analysis not yet implemented (Plan 2)[/dim]")
 
 
 # ---------------------------------------------------------------------------

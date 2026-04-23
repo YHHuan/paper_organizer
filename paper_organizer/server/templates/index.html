@@ -6,227 +6,540 @@
   <title>Paper Organizer</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Prevent double-tap zoom on iOS buttons */
-    button, select, input { touch-action: manipulation; }
+    /* Prevent double-tap zoom on iOS */
+    button, input, textarea, label { touch-action: manipulation; }
+
+    /* Smooth result card entrance */
+    #result-card {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #result-card.entering {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    /* Skeleton shimmer */
+    @keyframes shimmer {
+      0%   { background-position: -600px 0; }
+      100% { background-position: 600px 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+      background-size: 600px 100%;
+      animation: shimmer 1.4s infinite linear;
+      border-radius: 6px;
+    }
+
+    /* Backend pill active state */
+    .backend-pill input:checked + span {
+      background-color: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+    }
+
+    /* Section pills */
+    .section-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: #f3f4f6;
+      color: #9ca3af;
+      border: 1px solid #e5e7eb;
+      cursor: default;
+      white-space: nowrap;
+    }
+
+    /* Toast slide-in */
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes toast-out {
+      from { opacity: 1; transform: translateY(0); }
+      to   { opacity: 0; transform: translateY(16px); }
+    }
+    #toast {
+      animation: toast-in 0.25s ease forwards;
+    }
+    #toast.leaving {
+      animation: toast-out 0.25s ease forwards;
+    }
+
+    /* Collapsible abstract */
+    #abstract-body {
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
   </style>
 </head>
-<body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+<body class="min-h-screen bg-gray-50 font-[system-ui,sans-serif] text-gray-900 antialiased">
 
-  <!-- Header -->
-  <header class="bg-white border-b border-gray-200 px-4 py-5">
-    <div class="max-w-lg mx-auto">
-      <h1 class="text-2xl font-bold tracking-tight text-gray-900">Paper Organizer</h1>
-      <p class="mt-1 text-sm text-gray-500">
-        Paste a paper URL, DOI, or PMID to add it to your library
-      </p>
+  <!-- ─── Header ──────────────────────────────────────────── -->
+  <header class="bg-white border-b border-gray-200">
+    <div class="max-w-xl mx-auto px-5 py-5 flex items-center gap-3">
+      <!-- Icon -->
+      <div class="shrink-0 w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"
+             viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight text-gray-900 leading-tight">Paper Organizer</h1>
+        <p class="text-xs text-gray-400 leading-tight">Drop a paper link, get structured notes.</p>
+      </div>
     </div>
   </header>
 
-  <!-- Main -->
-  <main class="max-w-lg mx-auto px-4 py-8 space-y-8">
+  <!-- ─── Main ─────────────────────────────────────────────── -->
+  <main class="max-w-xl mx-auto px-4 py-7 space-y-5">
 
-    <!-- Submission form -->
-    <section class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-5">
+    <!-- Input card -->
+    <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-5">
 
+      <!-- Textarea -->
       <div class="space-y-2">
-        <label for="input_text" class="block text-sm font-medium text-gray-700">
+        <label for="input_text" class="block text-sm font-semibold text-gray-700">
           Paper URL, DOI, or PMID
         </label>
         <textarea
           id="input_text"
           name="input_text"
           rows="3"
-          class="w-full rounded-xl border border-gray-300 px-4 py-3 text-base
-                 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500
-                 focus:border-transparent resize-none"
-          placeholder="https://pubmed.ncbi.nlm.nih.gov/12345678&#10;10.1056/NEJMoa2304146&#10;PMID: 12345678"
+          spellcheck="false"
+          autocorrect="off"
+          autocapitalize="off"
+          class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base
+                 leading-relaxed placeholder-gray-400
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                 focus:bg-white resize-none transition-colors"
+          placeholder="https://pubmed.ncbi.nlm.nih.gov/38226862&#10;10.1056/NEJMoa2304146&#10;PMID: 38226862"
         ></textarea>
       </div>
 
-      <!-- Backend selector -->
+      <!-- Backend selector — pill style -->
       <div class="space-y-2">
-        <p class="text-sm font-medium text-gray-700">Add to</p>
-        <div class="flex flex-wrap gap-3">
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input type="radio" name="backend" value="zotero" checked
-                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-            <span class="text-sm text-gray-700">Zotero</span>
+        <p class="text-sm font-semibold text-gray-700">Add to</p>
+        <div class="flex gap-2">
+          <label class="backend-pill cursor-pointer">
+            <input type="radio" name="backend" value="zotero" checked class="sr-only" onchange="updatePills()" />
+            <span class="block px-4 py-2 rounded-full border border-gray-200 text-sm font-medium
+                         text-gray-600 bg-gray-50 transition-colors select-none">
+              Zotero
+            </span>
           </label>
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input type="radio" name="backend" value="endnote"
-                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-            <span class="text-sm text-gray-700">EndNote</span>
+          <label class="backend-pill cursor-pointer">
+            <input type="radio" name="backend" value="endnote" class="sr-only" onchange="updatePills()" />
+            <span class="block px-4 py-2 rounded-full border border-gray-200 text-sm font-medium
+                         text-gray-600 bg-gray-50 transition-colors select-none">
+              EndNote
+            </span>
           </label>
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input type="radio" name="backend" value="both"
-                   class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-            <span class="text-sm text-gray-700">Both</span>
+          <label class="backend-pill cursor-pointer">
+            <input type="radio" name="backend" value="both" class="sr-only" onchange="updatePills()" />
+            <span class="block px-4 py-2 rounded-full border border-gray-200 text-sm font-medium
+                         text-gray-600 bg-gray-50 transition-colors select-none">
+              Both
+            </span>
           </label>
         </div>
       </div>
 
-      <!-- Submit -->
+      <!-- Submit button -->
       <button
         id="submit-btn"
         type="button"
         onclick="submitPaper()"
-        class="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600
+        class="w-full flex items-center justify-center gap-2.5 rounded-xl bg-blue-600
                px-5 py-3.5 text-base font-semibold text-white
-               hover:bg-blue-700 active:bg-blue-800
+               hover:bg-blue-700 active:bg-blue-800 active:scale-[0.99]
                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-               transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+               transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <span id="btn-label">Add Paper</span>
         <!-- Spinner (hidden by default) -->
-        <svg id="spinner" class="hidden animate-spin h-5 w-5 text-white"
+        <svg id="btn-spinner" class="hidden animate-spin h-5 w-5 text-white shrink-0"
              xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10"
                   stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor"
                 d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
         </svg>
+        <span id="btn-label">Analyze Paper</span>
       </button>
+
+      <!-- Keyboard hint -->
+      <p class="text-center text-xs text-gray-400 -mt-1">
+        <kbd class="font-mono bg-gray-100 border border-gray-200 rounded px-1 py-0.5 text-gray-500">
+          ⌘ Enter
+        </kbd>
+        to submit
+      </p>
     </section>
 
-    <!-- Response area (hidden until first submission) -->
-    <section id="response-area" class="hidden">
-      <div id="response-box"
-           class="rounded-2xl border px-5 py-4 text-sm leading-relaxed space-y-1">
+    <!-- ── Skeleton loader (hidden until loading) ──────────── -->
+    <section id="skeleton-card"
+             class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+      <div class="skeleton h-5 w-3/4"></div>
+      <div class="skeleton h-4 w-1/2"></div>
+      <div class="space-y-2">
+        <div class="skeleton h-3 w-full"></div>
+        <div class="skeleton h-3 w-5/6"></div>
+        <div class="skeleton h-3 w-4/6"></div>
+      </div>
+      <div class="flex gap-2">
+        <div class="skeleton h-6 w-20 rounded-full"></div>
+        <div class="skeleton h-6 w-24 rounded-full"></div>
+        <div class="skeleton h-6 w-16 rounded-full"></div>
       </div>
     </section>
 
-    <!-- Recent submissions placeholder -->
-    <section class="space-y-3">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">How to use</h2>
-      <ul class="space-y-2 text-sm text-gray-600">
-        <li class="flex gap-2">
-          <span class="mt-0.5 text-blue-500 shrink-0">1.</span>
-          Paste any PubMed URL, DOI, or bare PMID into the field above.
-        </li>
-        <li class="flex gap-2">
-          <span class="mt-0.5 text-blue-500 shrink-0">2.</span>
-          Choose the reference manager you want the paper added to.
-        </li>
-        <li class="flex gap-2">
-          <span class="mt-0.5 text-blue-500 shrink-0">3.</span>
-          Tap <strong>Add Paper</strong>. The server fetches metadata and imports it automatically.
-        </li>
-      </ul>
-    </section>
+    <!-- ── Result card (hidden until response) ─────────────── -->
+    <section id="result-card"
+             class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-5">
 
-    <!-- Divider -->
-    <hr class="border-gray-200" />
+      <!-- Title + meta row -->
+      <div class="space-y-1.5">
+        <h2 id="res-title" class="text-base font-bold text-gray-900 leading-snug"></h2>
+        <p id="res-meta" class="text-sm text-gray-500"></p>
 
-    <!-- Mobile Setup -->
-    <section class="space-y-3">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Mobile Setup</h2>
-      <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 space-y-3 text-sm text-amber-900">
-        <p>
-          To use Paper Organizer from your phone, your computer must be running
-          the tunnel command:
-        </p>
-        <pre class="bg-amber-100 rounded-lg px-3 py-2 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all">paper-organizer serve --tunnel</pre>
-        <p>
-          This starts a Cloudflare Tunnel and prints a public HTTPS URL.
-          Open that URL on any device — no VPN or port-forwarding needed.
-        </p>
-        <p class="text-xs text-amber-700">
-          The tunnel URL changes each time the command is run. Share it fresh
-          with lab members each session, or use a named tunnel for a stable URL.
-        </p>
+        <!-- Journal badge -->
+        <span id="res-journal-badge"
+              class="hidden inline-block mt-1 text-xs font-medium bg-blue-50 text-blue-700
+                     border border-blue-100 px-2.5 py-0.5 rounded-full">
+        </span>
       </div>
+
+      <!-- Abstract (collapsible) -->
+      <div id="abstract-wrapper" class="hidden space-y-1">
+        <button id="abstract-toggle"
+                onclick="toggleAbstract()"
+                class="flex items-center gap-1.5 text-sm font-medium text-gray-700
+                       hover:text-blue-600 transition-colors focus:outline-none">
+          <svg id="abstract-chevron"
+               class="w-4 h-4 text-gray-400 transition-transform duration-200"
+               fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+          Abstract
+        </button>
+        <div id="abstract-body" style="max-height: 0;">
+          <p id="res-abstract"
+             class="text-sm text-gray-600 leading-relaxed pt-1 pb-1 border-l-2 border-blue-100 pl-3">
+          </p>
+        </div>
+      </div>
+
+      <!-- Status message -->
+      <div id="res-status-row" class="flex items-start gap-2.5 rounded-xl p-3 text-sm">
+        <svg id="status-icon-check"
+             class="hidden shrink-0 w-5 h-5 text-green-500 mt-0.5" fill="none"
+             stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        <svg id="status-icon-warn"
+             class="hidden shrink-0 w-5 h-5 text-amber-500 mt-0.5" fill="none"
+             stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+        <span id="res-status-msg" class="text-gray-700 leading-snug"></span>
+      </div>
+
+      <!-- PDF availability badge -->
+      <div id="res-pdf-row" class="hidden flex items-center gap-2 text-sm text-gray-500">
+        <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor"
+             stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+        <span id="res-pdf-msg"></span>
+      </div>
+
+      <!-- Divider -->
+      <hr class="border-gray-100" />
+
+      <!-- Analysis section pills -->
+      <div class="space-y-3">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Analysis</p>
+        <div class="flex flex-wrap gap-2">
+          <span class="section-pill">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Study Design
+          </span>
+          <span class="section-pill">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+            </svg>
+            Methods
+          </span>
+          <span class="section-pill">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Results
+          </span>
+          <span class="section-pill">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            Clinical Relevance
+          </span>
+          <span class="section-pill">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            Novelty
+          </span>
+          <span class="section-pill">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Limitations
+          </span>
+          <span class="section-pill">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            Action Items
+          </span>
+        </div>
+
+        <!-- Notes placeholder -->
+        <div class="rounded-xl bg-gray-50 border border-dashed border-gray-200 px-4 py-5 text-center">
+          <p class="text-sm text-gray-400">Notes will appear here after LLM analysis.</p>
+        </div>
+      </div>
+
     </section>
 
   </main>
 
-  <!-- Footer -->
-  <footer class="max-w-lg mx-auto px-4 py-6 text-center text-xs text-gray-400">
-    Paper Organizer &mdash; running on localhost:7788
+  <!-- ─── Footer ──────────────────────────────────────────── -->
+  <footer class="max-w-xl mx-auto px-5 pb-8 pt-2 text-center text-xs text-gray-400 space-x-1">
+    <span>Running locally</span>
+    <span class="text-gray-300">&middot;</span>
+    <span>Mobile: <code class="font-mono">paper-organizer serve --tunnel</code></span>
+    <span class="text-gray-300">&middot;</span>
+    <span>v0.1</span>
   </footer>
 
+  <!-- ─── Toast container ───────────────────────────────────── -->
+  <div id="toast-container"
+       class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none
+              flex flex-col items-center gap-2">
+  </div>
+
   <script>
+    // ── State ─────────────────────────────────────────────────
+    let abstractOpen = false;
+
+    // ── Pill visual sync (CSS :checked only works at first paint without JS) ──
+    function updatePills() {
+      document.querySelectorAll('.backend-pill').forEach(pill => {
+        const input = pill.querySelector('input');
+        const span  = pill.querySelector('span');
+        if (input.checked) {
+          span.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+          span.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
+        } else {
+          span.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+          span.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
+        }
+      });
+    }
+    updatePills(); // run once on load
+
+    // ── Submit ────────────────────────────────────────────────
     async function submitPaper() {
       const inputEl = document.getElementById('input_text');
-      const input   = inputEl.value.trim();
+      const text    = inputEl.value.trim();
       const backend = document.querySelector('input[name="backend"]:checked')?.value ?? 'zotero';
 
-      if (!input) {
-        showResponse('error', 'Please enter a URL, DOI, or PMID first.');
+      if (!text) {
+        showToast('Please paste a URL, DOI, or PMID first.', 'warn');
+        inputEl.focus();
         return;
       }
 
       setLoading(true);
+      hideResult();
 
-      const formData = new FormData();
-      formData.append('input_text', input);
-      formData.append('backend', backend);
+      const form = new FormData();
+      form.append('input_text', text);
+      form.append('backend', backend);
 
       try {
-        const res  = await fetch('/ingest', { method: 'POST', body: formData });
+        const res  = await fetch('/ingest', { method: 'POST', body: form });
         const data = await res.json();
 
         if (!res.ok || data.status === 'error') {
-          showResponse('error', data.message ?? 'Something went wrong.');
+          showToast(data.message ?? 'Something went wrong.', 'error');
         } else {
-          showResponse('success', data.message ?? 'Queued!', {
-            Input:   data.input,
-            Backend: data.backend,
-            Status:  data.status,
-          });
-          inputEl.value = ''; // clear on success
+          renderResult(data);
+          inputEl.value = '';
         }
       } catch (err) {
-        showResponse('error', 'Network error — is the server running? ' + err.message);
+        showToast('Network error — is the server running? ' + err.message, 'error');
       } finally {
         setLoading(false);
       }
     }
 
+    // ── Loading state ─────────────────────────────────────────
     function setLoading(on) {
       const btn     = document.getElementById('submit-btn');
       const label   = document.getElementById('btn-label');
-      const spinner = document.getElementById('spinner');
-      btn.disabled  = on;
-      label.textContent = on ? 'Submitting…' : 'Add Paper';
+      const spinner = document.getElementById('btn-spinner');
+      const skel    = document.getElementById('skeleton-card');
+
+      btn.disabled = on;
+      label.textContent = on ? 'Analyzing…' : 'Analyze Paper';
       spinner.classList.toggle('hidden', !on);
+      skel.classList.toggle('hidden', !on);
     }
 
-    function showResponse(type, message, details) {
-      const area = document.getElementById('response-area');
-      const box  = document.getElementById('response-box');
+    function hideResult() {
+      document.getElementById('result-card').classList.add('hidden');
+    }
 
-      const isSuccess = type === 'success';
-      box.className = [
-        'rounded-2xl border px-5 py-4 text-sm leading-relaxed space-y-2',
-        isSuccess
-          ? 'bg-green-50 border-green-200 text-green-900'
-          : 'bg-red-50  border-red-200  text-red-900',
-      ].join(' ');
+    // ── Render result card ────────────────────────────────────
+    function renderResult(data) {
+      const card = document.getElementById('result-card');
 
-      let html = `<p class="font-medium">${escHtml(message)}</p>`;
+      // Title
+      document.getElementById('res-title').textContent =
+        data.title || 'Untitled paper';
 
-      if (details) {
-        html += '<dl class="text-xs space-y-0.5 opacity-80">';
-        for (const [k, v] of Object.entries(details)) {
-          html += `<div class="flex gap-1"><dt class="font-semibold">${escHtml(k)}:</dt>
-                   <dd class="break-all">${escHtml(String(v))}</dd></div>`;
-        }
-        html += '</dl>';
+      // Authors + year
+      const authors = (data.authors || []).join(', ');
+      const year    = data.year ? ` · ${data.year}` : '';
+      document.getElementById('res-meta').textContent = authors
+        ? authors + year
+        : (data.year || '');
+
+      // Journal badge
+      const badge = document.getElementById('res-journal-badge');
+      if (data.journal) {
+        badge.textContent = data.journal;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
       }
 
-      box.innerHTML = html;
-      area.classList.remove('hidden');
-      area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Abstract
+      const absWrapper = document.getElementById('abstract-wrapper');
+      const absBody    = document.getElementById('abstract-body');
+      const absPara    = document.getElementById('res-abstract');
+      if (data.abstract) {
+        absPara.textContent = data.abstract;
+        absWrapper.classList.remove('hidden');
+        // Reset collapsed state
+        abstractOpen = false;
+        absBody.style.maxHeight = '0';
+        document.getElementById('abstract-chevron').style.transform = '';
+      } else {
+        absWrapper.classList.add('hidden');
+      }
+
+      // Status message
+      const statusRow = document.getElementById('res-status-row');
+      const statusMsg = document.getElementById('res-status-msg');
+      const iconCheck = document.getElementById('status-icon-check');
+      const iconWarn  = document.getElementById('status-icon-warn');
+
+      statusMsg.textContent = data.message || '';
+
+      if (data.status === 'success') {
+        statusRow.className = 'flex items-start gap-2.5 rounded-xl p-3 text-sm bg-green-50';
+        iconCheck.classList.remove('hidden');
+        iconWarn.classList.add('hidden');
+        statusMsg.className = 'text-green-800 leading-snug';
+      } else {
+        statusRow.className = 'flex items-start gap-2.5 rounded-xl p-3 text-sm bg-amber-50';
+        iconWarn.classList.remove('hidden');
+        iconCheck.classList.add('hidden');
+        statusMsg.className = 'text-amber-800 leading-snug';
+      }
+
+      // PDF row
+      const pdfRow = document.getElementById('res-pdf-row');
+      const pdfMsg = document.getElementById('res-pdf-msg');
+      if (data.pdf_available !== undefined) {
+        pdfRow.classList.remove('hidden');
+        pdfMsg.textContent = data.pdf_available
+          ? 'Open-access PDF available'
+          : 'No open-access PDF found';
+      } else {
+        pdfRow.classList.add('hidden');
+      }
+
+      // Animate in
+      card.classList.remove('hidden');
+      card.classList.add('entering');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          card.classList.remove('entering');
+        });
+      });
+
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    function escHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    // ── Abstract toggle ───────────────────────────────────────
+    function toggleAbstract() {
+      const body    = document.getElementById('abstract-body');
+      const chevron = document.getElementById('abstract-chevron');
+      const para    = document.getElementById('res-abstract');
+
+      abstractOpen = !abstractOpen;
+      if (abstractOpen) {
+        body.style.maxHeight = para.scrollHeight + 32 + 'px';
+        chevron.style.transform = 'rotate(180deg)';
+      } else {
+        body.style.maxHeight = '0';
+        chevron.style.transform = '';
+      }
     }
 
-    // Allow Cmd/Ctrl+Enter to submit from the textarea
+    // ── Toast ─────────────────────────────────────────────────
+    function showToast(msg, type = 'error') {
+      const container = document.getElementById('toast-container');
+
+      const colors = {
+        error: 'bg-red-600 text-white',
+        warn:  'bg-amber-500 text-white',
+        info:  'bg-gray-800 text-white',
+      };
+
+      const toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.className = [
+        'pointer-events-auto px-5 py-3 rounded-2xl shadow-lg text-sm font-medium max-w-sm text-center',
+        colors[type] || colors.info,
+      ].join(' ');
+      toast.textContent = msg;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.add('leaving');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+      }, 3500);
+    }
+
+    // ── Keyboard shortcut: Cmd/Ctrl+Enter ────────────────────
     document.getElementById('input_text').addEventListener('keydown', e => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submitPaper();
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        submitPaper();
+      }
     });
   </script>
 </body>
