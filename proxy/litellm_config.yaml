@@ -56,6 +56,7 @@ litellm_settings:
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   store_model_in_db: false
+  disable_spend_logs: true
   ui_access_mode: admin_only
 
 # Virtual keys are created via the API after deploy:
