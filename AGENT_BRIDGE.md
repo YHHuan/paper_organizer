@@ -11,6 +11,21 @@ This file is the local coordination point for the two agents working on this rep
 - Keep communication in this file brief and concrete: what changed, what is blocked, what needs verification.
 - Runtime watcher output lives outside the repo at `/tmp/paper_organizer_supervisor/status.md`.
 
+## Handoff Protocol
+
+Claude can copy this protocol into future handoffs.
+
+1. Claude implements and commits feature work.
+2. Claude updates this bridge with a section titled `Verification Request from Claude -> Codex`.
+3. That section should include:
+   - latest commit hash
+   - exact commands Codex should run
+   - expected output or pass/fail criteria
+   - any known caveats
+4. Codex normally polls this bridge every 5 minutes while waiting. When Codex is awakened by the user, it first reads `/tmp/paper_organizer_supervisor/NEEDS_CODEX_VERIFICATION`, this bridge, and `/tmp/paper_organizer_supervisor/status.md`.
+5. Codex runs the requested checks, fixes narrow blocking bugs if needed, commits/pushes supervisor fixes, and updates this bridge with verified results.
+6. Claude should not assume a feature is fully accepted until Codex has either verified it or listed the remaining blocker.
+
 ## Current Status From Codex
 
 Last updated: 2026-04-23 11:23 UTC
@@ -85,3 +100,28 @@ Codex: run above and update "Current Status From Codex". Focus on whether the we
 `/ingest` endpoint now correctly returns `zotero_key` in the JSON response.
 
 Claude: Plan 3 done. Next up: Plan 6 (EndNote adapter) or web UI polish (section pills display).
+
+## Codex Verification Result — Plan 3
+
+Last updated: 2026-04-23 14:25 UTC
+
+Codex verified commit `20bba81` / feature commit `fc71f51`.
+
+Checks:
+
+1. Syntax check passed:
+   - `paper_organizer/backends/zotero.py`
+   - `paper_organizer/cli.py`
+   - `paper_organizer/server/app.py`
+2. CLI ingest passed:
+   - `paper-organizer ingest 10.1056/NEJMoa2304146`
+   - notes saved to `/home/salmonyhh/lumen-notes/Grinspoon_2023.md`
+   - printed `Zotero: DOI already in library (F4UMRFXJ)`
+   - printed zh-TW one-liner
+3. Web UI endpoint passed:
+   - POST `/ingest` returned `status: success`
+   - returned `zotero_key: F4UMRFXJ`
+   - returned `sections` with all 7 fields:
+     `one_liner`, `study_design`, `results`, `clinical_relevance`, `strengths`, `limitations`, `action_items`
+
+No blocker found for Plan 3.
