@@ -4,5 +4,6 @@ COPY litellm_config.yaml /app/config.yaml
 
 ENV PORT=8000
 
-# Shell form (not JSON array) so $PORT is expanded at runtime
-CMD litellm --config /app/config.yaml --port ${PORT}
+# Clear base image ENTRYPOINT, then use sh -c so ${PORT} expands
+ENTRYPOINT []
+CMD ["sh", "-c", "litellm --config /app/config.yaml --port ${PORT:-8000}"]
