@@ -12,7 +12,7 @@ templates = Jinja2Templates(directory=str(_HERE / "templates"))
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve the main UI."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 @app.post("/ingest")
