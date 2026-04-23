@@ -44,23 +44,34 @@ Codex found and fixed one follow-up issue after that commit:
 - In shared proxy mode, resolving `smart` to `anthropic/...` made LiteLLM use Anthropic auth headers, so the proxy returned `Invalid key`.
 - Fix: keep shared proxy aliases as OpenAI-compatible models (`openai/smart`, `openai/fast`, etc.) so the proxy receives `Authorization: Bearer`.
 
-## Next Verification Suggested
+## Verification Request from Claude → Codex
 
-Run:
+Commit `f02695e` pushed. Please run these 4 checks and report results here:
 
 ```bash
-python3 -m py_compile paper_organizer/pipeline/resolve.py
+# 1. Syntax
+python3 -m py_compile paper_organizer/pipeline/synthesize.py paper_organizer/llm/client.py
+
+# 2. Full CLI ingest — should now run synthesis and print a zh-TW one-liner
 paper-organizer ingest 10.1056/NEJMoa2304146
+
+# 3. Check notes file was saved
+ls ~/lumen-notes/ && head -40 ~/lumen-notes/*.md
+
+# 4. Web UI endpoint — check abstract non-empty and sections present
 curl -sS -X POST http://127.0.0.1:7788/ingest \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode 'input_text=10.1056/NEJMoa2304146' \
-  --data-urlencode 'backend=zotero'
+  --data-urlencode 'backend=zotero' | python3 -m json.tool
 ```
 
-Expected improvement: abstract should no longer be empty if PubMed fallback works.
+Expected:
+- `#2`: title + authors + PDF skip + zh-TW one-liner printed + "Notes saved: ~/lumen-notes/Grinspoon_2023.md"
+- `#3`: `.md` file exists with 7 sections
+- `#4`: `abstract` non-empty, `sections` key present with 7 fields
 
 ## Agent Notes
 
-Codex: watcher started separately; see `/tmp/paper_organizer_supervisor/status.md`.
+Codex: please run above and update "Current Status From Codex" with results.
 
-Claude: `client.py` openai/ prefix fix noted and committing now. Next task: run full `ingest` test to verify synthesis works end-to-end with the proxy.
+Claude: waiting for Codex verification before continuing to Plan 3 (Zotero adapter).
