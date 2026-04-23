@@ -4,7 +4,7 @@ import asyncio as _asyncio
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
@@ -19,7 +19,12 @@ templates = Jinja2Templates(directory=str(_HERE / "templates"))
 # ---------------------------------------------------------------------------
 
 
-async def _run_pipeline(paper_id: str, backend: str, pdf_text: str = "") -> dict:
+async def _run_pipeline(
+    paper_id: str,
+    backend: str,
+    pdf_text: str = "",
+    pdf_path: Path | None = None,
+) -> dict:
     """Resolve → synthesize → push to backends. Returns JSON-ready dict."""
     from paper_organizer.config import get_config, get_secret
     from paper_organizer.pipeline.resolve import resolve
@@ -55,7 +60,7 @@ async def _run_pipeline(paper_id: str, backend: str, pdf_text: str = "") -> dict
         if backend in ("endnote", "both"):
             try:
                 from paper_organizer.backends.endnote import export_to_endnote
-                xml_path = export_to_endnote(metadata, analysis, None, cfg)
+                xml_path = export_to_endnote(metadata, analysis, pdf_path, cfg)
                 result["endnote_xml"] = str(xml_path)
             except Exception:
                 pass
@@ -67,7 +72,7 @@ async def _run_pipeline(paper_id: str, backend: str, pdf_text: str = "") -> dict
                 zot_key = cfg.backend.zotero_api_key or get_secret("zotero_api_key")
                 if cfg.backend.zotero_library_id and zot_key:
                     item_key, created = await _asyncio.to_thread(
-                        push_to_zotero, metadata, analysis, None, cfg
+                        push_to_zotero, metadata, analysis, pdf_path, cfg
                     )
                     result["zotero_key"] = item_key
                     result["zotero_created"] = created
@@ -124,7 +129,7 @@ async def ingest(
 
 @app.post("/upload-pdf")
 async def upload_pdf(
-    file: UploadFile,
+    file: UploadFile = File(...),
     backend: str = Form("zotero"),
 ):
     from paper_organizer.cli import _extract_watch_identifier
@@ -167,7 +172,7 @@ async def upload_pdf(
         if not dest_pdf.exists():
             shutil.copy2(tmp_path, dest_pdf)
 
-        result = await _run_pipeline(paper_id, backend, pdf_text_full)
+        result = await _run_pipeline(paper_id, backend, pdf_text_full, dest_pdf)
         result["source"] = "pdf_upload"
         result["detected_id"] = paper_id
         result["pdf_saved_path"] = str(dest_pdf)
@@ -268,6 +273,11 @@ async def save_settings(request: Request):
         set_secret("unpaywall_email", email)
         import os
         os.environ["PAPER_ORGANIZER_UNPAYWALL_EMAIL"] = email
+        try:
+            from paper_organizer.pipeline.contact import contact_email
+            contact_email.cache_clear()
+        except Exception:
+            pass
 
     save_config(cfg)
     return JSONResponse({"status": "ok"})

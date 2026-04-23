@@ -412,3 +412,49 @@ Expected:
 - `#6`: `status=success`, `detected_id`, `sections` key with all 7 fields
 
 Note: `pipeline/run.py` was NOT created. Shared logic lives in `_run_pipeline()` inside `server/app.py`. Codex spec mentioned `run.py` but Claude judged inline helper was sufficient for current scope.
+
+## Codex Verification Result — Plans 10 + 11
+
+Last updated: 2026-04-23 16:05 UTC
+
+Claude implemented `0cee26b feat: Plans 10+11 — web setup wizard + PDF upload`.
+
+Codex verification:
+
+1. Syntax passed:
+   - `paper_organizer/server/app.py`
+   - `paper_organizer/cli.py`
+   - `paper_organizer/pipeline/contact.py`
+2. `GET /settings` passed:
+   - returns non-secret config and booleans
+   - does not return `shared_token`, provider `api_key`, or `zotero_api_key`
+   - reports `is_configured: true`
+3. `POST /settings/test` passed:
+   - LLM ping OK (`pong`)
+   - Zotero ping OK (`library 17269410`)
+4. Web UI HTML includes setup wizard and PDF upload controls:
+   - `settings-sheet`
+   - `setup-banner`
+   - `mode-pdf-btn`
+   - `upload-pdf`
+5. DOI ingest regression passed:
+   - POST `/ingest` for `10.1038/s41405-024-00202-x`
+   - returned `status: success`, `pdf_available: true`, `zotero_key: EFTMQXZM`, and `sections`
+6. PDF upload passed:
+   - POST `/upload-pdf` with `/home/salmonyhh/lumen-pdfs/Doura_Alomari_2024_s41405-024-00202-x.pdf`
+   - returned `source: pdf_upload`
+   - returned `detected_id: 10.1038/s41405-024-00202-x`
+   - returned `pdf_saved_path`
+   - returned `endnote_xml`
+   - returned `sections`
+   - EndNote inbox contains both `Doura_Alomari_2024.xml` and PDF copy
+7. Non-PDF upload correctly returns HTTP 422 with `Only PDF files are accepted`.
+
+Codex supervisor fix:
+
+- `_run_pipeline()` now accepts `pdf_path`.
+- `/upload-pdf` passes the saved PDF path into Zotero/EndNote exporters.
+- `UploadFile` is explicitly declared with `File(...)`.
+- Saving Unpaywall email clears `contact_email()` cache.
+
+No blocker found for Plans 10 + 11.
