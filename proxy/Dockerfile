@@ -1,9 +1,7 @@
-FROM ghcr.io/berriai/litellm:main-latest
-
-COPY litellm_config.yaml /app/config.yaml
-
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app.py .
 ENV PORT=8000
-
-# Clear base image ENTRYPOINT, then use sh -c so ${PORT} expands
-ENTRYPOINT []
-CMD ["sh", "-c", "litellm --config /app/config.yaml --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]
